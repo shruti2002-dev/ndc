@@ -2,6 +2,13 @@
 Echo 1 | sudo tee /proc/sys/net/ipv4/ip_forward
 On client’s machine put nameserver 192.168.72.20 in /etc/resolv.conf
 
+Windows CMD
+ping -l 256 <ip>
+
+KALI
+sudo hping3 -1 -d 256 <ip>
+sudo hydra -L users.txt -P pass.txt ssh://<ip>
+
 
 IPTABLES
 ==========
