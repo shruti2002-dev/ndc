@@ -1,0 +1,159 @@
+Q1. Forward and Log HTTP Traffic (Port 80 → Port 8080)
+Commands
+
+echo 1 > /proc/sys/net/ipv4/ip_forward
+Does: Enables packet forwarding.
+
+iptables -A INPUT -i eth0 -p tcp --dport 80 -j LOG --log-prefix "HTTP_INBOUND: "
+Does: Logs all incoming HTTP requests.
+
+iptables -t nat -A PREROUTING -i eth0 -p tcp --dport 80 -j DNAT --to-destination 192.168.1.100:8080
+Does: Forwards public port 80 traffic to internal server port 8080.
+
+iptables -A FORWARD -p tcp -d 192.168.1.100 --dport 8080 -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+Does: Allows incoming connections to internal server.
+
+iptables -A FORWARD -p tcp -s 192.168.1.100 --sport 8080 -m state --state ESTABLISHED,RELATED -j ACCEPT
+Does: Allows only return traffic.
+
+iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+Does: Performs NAT for outbound traffic.
+________________________________________
+Q2. Allow Specific Host Header on Port 8080
+Commands
+
+iptables -A INPUT -p tcp --dport 8080 -m string --string "Host: www.example.com" --algo bm -j ACCEPT
+Does: Allows requests containing the specified Host header.
+
+iptables -A INPUT -p tcp --dport 8080 -m limit --limit 10/min --limit-burst 10 -j LOG --log-prefix "BLOCKED_HTTP_V4: "
+Does: Logs blocked requests with a maximum of 10 logs per minute.
+
+iptables -A INPUT -p tcp --dport 8080 -j DROP
+Does: Drops all other requests.
+
+
+IPv6
+ip6tables -A INPUT -p tcp --dport 8080 -m string --string "Host: www.example.com" --algo bm -j ACCEPT
+Does: Allows matching IPv6 requests.
+
+
+ip6tables -A INPUT -p tcp --dport 8080 -m limit --limit 10/min --limit-burst 10 -j LOG --log-prefix "BLOCKED_HTTP_V6: "
+Does: Logs blocked IPv6 requests.
+
+ip6tables -A INPUT -p tcp --dport 8080 -j DROP
+Does: Drops all other IPv6 requests.
+
+
+________________________________________
+Q3. OpenVPN Full Tunnel
+Commands
+
+apt install openvpn easy-rsa -y
+Does: Installs OpenVPN.
+
+echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+sysctl -p
+Does: Enables routing through VPN server.
+
+
+Server Configuration
+push "redirect-gateway def1 bypass-dhcp"
+Does: Sends all client internet traffic through VPN.
+push "dhcp-option DNS 8.8.8.8"
+push "dhcp-option DNS 8.8.4.4"
+Does: Pushes DNS settings to clients.
+compress lz4
+push "compress lz4"
+Does: Enables VPN compression.
+
+
+NAT
+iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE
+Does: Allows VPN clients to access the Internet.
+
+
+Start Service
+systemctl start openvpn-server@server
+systemctl enable openvpn-server@server
+Does: Starts OpenVPN automatically.
+________________________________________
+
+
+Q4. Nginx Reverse Proxy Load Balancer
+Install
+apt install nginx -y
+Does: Installs Nginx.
+
+Backend Pool
+
+upstream backend_pool {
+
+server 192.168.1.101:80 max_fails=3 fail_timeout=30s;
+server 192.168.1.102:80 max_fails=3 fail_timeout=30s;
+server 192.168.1.103:80 max_fails=3 fail_timeout=30s;
+
+}
+Does: Creates backend server pool.
+
+max_fails=3
+Does: Marks server down after 3 failures.
+
+fail_timeout=30s
+Does: Removes failed server for 30 seconds.
+
+Reverse Proxy
+location / {
+
+proxy_pass http://backend_pool;
+
+}
+Does: Sends requests to backend servers.
+
+Validate
+nginx -t
+Does: Checks configuration syntax.
+
+systemctl reload nginx
+Does: Reloads Nginx configuration.
+________________________________________
+
+Q5. Nagios Monitoring
+Install
+apt install nagios4 nagios-plugins -y
+Does: Installs Nagios.
+
+HTTP Check
+check_command check_http
+Does: Monitors HTTP service.
+
+HTTPS Check
+check_command check_https
+Does: Monitors HTTPS service.
+
+Passive Check
+active_checks_enabled 0
+passive_checks_enabled 1
+Does: Accepts results from external sources.
+
+Dependency Check
+define servicedependency{
+host_name WebServer
+service_description HTTP
+dependent_service_description HTTPS
+}
+Does: Prevents duplicate alerts.
+
+Email Escalation
+first_notification 3
+last_notification 5
+Does: Sends alerts after repeated failures.
+Graphing
+apt install pnp4nagios -y
+Does: Installs graphing tool.
+
+
+process_performance_data=1
+Does: Enables performance data collection.
+
+systemctl restart nagios
+Does: Applies monitoring configuration.
