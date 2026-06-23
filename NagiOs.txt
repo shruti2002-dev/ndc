@@ -1,0 +1,93 @@
+
+
+Install Nagios on Ubuntu Server
+=================================
+
+sudo apt update
+sudo apt install nagios4 monitoring-plugins nagios-nrpe-plugin apache2 -y
+sudo systemctl enable nagios4
+sudo systemctl start nagios4
+sudo systemctl enable apache2
+sudo systemctl start apache2
+sudo systemctl status nagios4
+sudo systemctl status apache2
+
+Set Nagios Web Login Password
+
+sudo htpasswd -c /etc/nagios4/htdigest.users nagiosadmin
+
+sudo systemctl restart apache2
+
+Open the dashboard in browser:
+http://192.168.1.10/nagios4
+Username: nagiosadmin
+Password: password you created
+
+
+Install NRPE on Each Client Machine
+=====================================
+sudo apt update
+sudo apt install nagios-nrpe-server monitoring-plugins -y
+sudo vi /etc/nagios/nrpe.cfg
+
+Find this line and add server-ip:
+allowed_hosts=127.0.0.1, <server-ip>
+
+
+sudo systemctl restart nagios-nrpe-server
+sudo systemctl enable nagios-nrpe-server
+sudo systemctl status nagios-nrpe-server
+
+Test Client from Nagios Server
+================================
+/usr/lib/nagios/plugins/check_nrpe -H  <client-ip>
+
+
+Add Client 1 in Nagios server
+=================================
+
+sudo vi /etc/nagios4/conf.d/client1.cfg
+
+define host {
+    use                     generic-host
+    host_name               client1
+    alias                   Ubuntu Client 1
+    address                 <client-ip>
+}
+
+
+define service {
+    use                     generic-service
+    host_name               client1
+    service_description     CPU Utilization
+    check_command           check_nrpe!check_cpu
+}
+
+
+define service {
+    use                     generic-service
+    host_name               client1
+    service_description     Memory Usage
+    check_command           check_nrpe!check_mem
+}
+
+
+Verify and Restart Nagios
+
+sudo nagios4 -v /etc/nagios4/nagios.cfg
+
+sudo systemctl restart nagios4
+sudo systemctl restart nagios-nrpe-server
+
+/usr/lib/nagios/plugins/check_nrpe -H  <client-ip> -c check_cpu
+/usr/lib/nagios/plugins/check_nrpe -H  <client-ip> -c check_mem
+
+Check Dashboard
+
+http://192.168.1.10/nagios4
+Go to Hosts.
+Go to Services.
+
+
+
+
